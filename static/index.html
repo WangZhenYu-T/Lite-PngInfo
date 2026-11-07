@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PNGInfo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="page-header">
+      <div>
+        <h1>PNGInfo</h1>
+        <p>读取 PNG 元信息，整理提示词与生成参数。</p>
+      </div>
+      <span id="status" class="status" role="status">等待读取</span>
+    </header>
+
+    <section class="toolbar" aria-label="操作栏">
+      <label class="switch-row">
+        <input id="show-image" type="checkbox" checked>
+        <span>显示图片</span>
+      </label>
+      <label class="mode-row">
+        <span>输出模式</span>
+        <select id="output-mode">
+          <option value="categorized">分类模式</option>
+          <option value="json">JSON 模式</option>
+        </select>
+      </label>
+      <button id="read-button" class="button primary" type="button">读取</button>
+      <button id="reset-button" class="button" type="button">重置</button>
+      <button id="favorite-button" class="button" type="button" disabled>收藏当前</button>
+    </section>
+
+    <section class="workspace">
+      <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="拖入 PNG 图片">
+        <input id="file-input" type="file" accept="image/png,.png" hidden>
+        <div class="drop-title">把 PNG 图片拖到这里</div>
+        <div class="drop-hint">也可以点击选择文件，读取 NovelAI、ComfyUI 等 PNG 元信息</div>
+        <div id="selected-file" class="selected-file">尚未选择文件</div>
+      </div>
+
+      <div id="preview-panel" class="preview-panel is-hidden">
+        <div class="panel-heading"><h2>预览</h2><span id="image-size"></span></div>
+        <img id="preview-image" alt="当前读取的 PNG 图片">
+      </div>
+    </section>
+
+    <section id="result-section" class="result-section is-hidden">
+      <div class="result-heading">
+        <h2>读取结果</h2>
+        <button id="copy-button" class="text-button" type="button">复制结果</button>
+      </div>
+      <div id="categorized-result" class="categorized-result"></div>
+      <pre id="json-result" class="json-result is-hidden"></pre>
+    </section>
+
+    <section class="favorites-section">
+      <div class="result-heading">
+        <h2>收藏</h2>
+        <button id="refresh-favorites" class="text-button" type="button">刷新</button>
+      </div>
+      <div id="favorites-list" class="favorites-list"><p class="empty-state">还没有收藏内容。</p></div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
