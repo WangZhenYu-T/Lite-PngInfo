@@ -1,5 +1,12 @@
 # Changelog
 
+## Desktop release packaging
+
+- Ready-to-run Windows x64 ZIPs for v1 and v2, including Python/Pillow, local-only server, automatic browser launch, and an Exit window.
+- Preserve version-specific application code, keep favorites beside the executable, and choose a free port if 8765 is occupied.
+- Test both built and extracted applications without a Python PATH; include version identifiers, dependency notices, and SHA-256 checksums.
+- Organize README as a complete English guide followed by the corresponding Chinese guide, with download-and-run instructions first.
+
 ## v2 maintenance
 
 - Close SQLite connections explicitly in the two new favorite-upgrade tests so Windows can delete temporary database and backup files.

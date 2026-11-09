@@ -16,3 +16,9 @@ venv/
 /opencode.json
 /opencode.jsonc
 /.opencode/
+
+# Local release build output
+/release-dist/
+/build/
+/dist/
+/*.spec
