@@ -2,6 +2,31 @@
 
 A lightweight, local web UI for reading PNG metadata, organizing generation prompts and parameters, and saving favorite images in SQLite.
 
+## 版本区别 / Version history
+
+当前版本为 **v2**。v1 是最初的 NAI 元信息阅读与本地收藏版本；v2 增加多来源分类、原始字段浏览和明确的空状态。v3 收藏独立大图查看器、v4 Civitai 查询仍为计划功能。
+
+| 能力 | v1 | v2（当前） |
+|---|---|---|
+| NAI 分类 | 顶层正负提示词与基础参数 | 保留原能力，增加角色提示词分区与来源模型信息 |
+| A1111 / Forge | 能读到 parameters 文本，尚无专用分类 | 提取正负提示词、生成参数、已记录的 checkpoint / LoRA 及 hash |
+| ComfyUI | 原始 prompt / workflow 字符串 | 简单且无歧义的路径可提取提示词；复杂图引导查看 JSON 或导入 ComfyUI，分类不猜测模型与采样参数 |
+| JSON 浏览与复制 | 展示整理后的完整响应 | 任意文本字段格式化浏览、逐字段复制原文、导出有序字段集合 |
+| 原文与精度 | 部分字段被原位解码，重复 key 被覆盖 | 保留重复文本条目、压缩/后置文本与原始字符串；大整数 seed 保持准确 |
+| 无生成元信息 PNG | 可读取，但缺少专门的空状态展示 | 明确提示，保留预览、基本信息和收藏能力 |
+| 收藏 | 保存原图与当时解析结果 | 增加来源标识；旧记录打开时重新解析，写回前备份，保留原图、ID 和创建时间 |
+| 换图与重置 | 基础操作 | 失效旧结果，避免旧响应覆盖新图或重置状态 |
+| 运行依赖 | Python + Pillow | 相同，无新增依赖或前端构建步骤 |
+
+Current version: **v2**. v1 provided NAI extraction, normalized JSON output, and SQLite favorites. v2 adds source-specific classification, lossless original-text access, explicit empty states, and on-demand favorite upgrades. See [CHANGELOG.md](CHANGELOG.md) for change details.
+
+### 从 v1 升级 / Upgrading from v1
+
+1. 停止旧应用，更新代码后按原启动方式运行；依赖安装仍使用 `requirements.txt`。
+2. 保留 `data/favorites.sqlite3`，无需手动改表。旧收藏首次打开时更新分类；更新前自动保存 `data/favorites.before-v2.sqlite3`。
+3. v2 的 JSON 视图按原始字段组织，不再输出重复的 `raw` / `png_text`；分类 seed 用十进制字符串，原文字段的内容保持不变。
+4. 备份包含旧收藏数据，解除收藏只修改当前数据库；不再需要备份时可自行删除备份文件。
+
 ## Features
 
 - Drag and drop a PNG or choose one from the file picker.
@@ -95,5 +120,3 @@ python -m unittest discover -s tests -v
 ```
 
 Tests generate small PNGs and use temporary databases and ephemeral ports. They do not modify your favorites or stop a running instance. CI runs the same tests on Windows and Ubuntu with Python 3.10 and 3.13.
-
-v2 is implemented locally. The independent favorite image viewer (v3) and Civitai lookup (v4) are planned. See [development notes](docs/DEVELOPMENT.md) and the [version iteration plan](docs/ROADMAP.md) for scope and validation details.

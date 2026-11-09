@@ -4,6 +4,7 @@ import http.cookiejar
 import io
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 import shutil
 import sys
@@ -113,7 +114,7 @@ class AppTests(unittest.TestCase):
         data = self.read_png()
         favorite_id = self.request("/api/favorites", b"")["id"]
         old_metadata = {"file": {"width": 32, "height": 48}, "raw": {"Comment": {"prompt": "old"}}}
-        with sqlite3.connect(app.DB_PATH) as db:
+        with closing(sqlite3.connect(app.DB_PATH)) as db, db:
             db.execute("UPDATE favorites SET metadata_json=?, prompt='old', created_at='original-date' WHERE id=?",
                        (json.dumps(old_metadata), favorite_id))
         listed = self.request("/api/favorites")["favorites"][0]
@@ -123,12 +124,12 @@ class AppTests(unittest.TestCase):
         self.assertEqual(updated["metadata"]["generation"]["seed"], "42")
         self.assertEqual(updated["favorite"]["created_at"], "original-date")
         self.assertEqual(updated["favorite"]["id"], favorite_id)
-        with sqlite3.connect(app.DB_PATH) as db:
+        with closing(sqlite3.connect(app.DB_PATH)) as db:
             image, metadata = db.execute("SELECT image, metadata_json FROM favorites WHERE id=?", (favorite_id,)).fetchone()
         self.assertEqual(image, data)
         self.assertEqual(json.loads(metadata)["source"]["label"], "NAI")
         backup = app.DB_PATH.with_name("favorites.before-v2.sqlite3")
-        with sqlite3.connect(backup) as db:
+        with closing(sqlite3.connect(backup)) as db:
             metadata = db.execute("SELECT metadata_json FROM favorites WHERE id=?", (favorite_id,)).fetchone()[0]
         self.assertEqual(json.loads(metadata), old_metadata)
         self.assertTrue(self.request("/api/favorites", b"")["already_exists"])
@@ -138,13 +139,13 @@ class AppTests(unittest.TestCase):
         favorite_id = self.request("/api/favorites", b"")["id"]
         old = {"file": {"width": 32, "height": 48}, "raw": {"Comment": {"prompt": "archived"}},
                "prompts": {"prompt": "archived", "negative_prompt": ""}}
-        with sqlite3.connect(app.DB_PATH) as db:
+        with closing(sqlite3.connect(app.DB_PATH)) as db, db:
             db.execute("UPDATE favorites SET metadata_json=?, image=? WHERE id=?",
                        (json.dumps(old), b"broken", favorite_id))
         result = self.request(f"/api/favorites/{favorite_id}")
         self.assertEqual(result["metadata"]["prompts"]["prompt"], "archived")
         self.assertEqual(result["metadata"]["entries"][0]["kind"], "archived")
-        with sqlite3.connect(app.DB_PATH) as db:
+        with closing(sqlite3.connect(app.DB_PATH)) as db:
             self.assertEqual(json.loads(db.execute("SELECT metadata_json FROM favorites").fetchone()[0]), old)
 
 

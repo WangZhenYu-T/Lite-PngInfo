@@ -1,5 +1,11 @@
 # Changelog
 
+## v2 maintenance
+
+- Close SQLite connections explicitly in the two new favorite-upgrade tests so Windows can delete temporary database and backup files.
+- Run every CI matrix job to completion even if another fails, and add a v1/v2 comparison plus upgrade instructions to README.
+- Remove internal planning, development notes, and agent configuration from the distributed repository tree; keep them locally ignored.
+
 ## v2
 
 - NAI, A1111, and Forge categorized metadata, recorded model/LoRA names and hashes, and NAI v4 character prompts.
