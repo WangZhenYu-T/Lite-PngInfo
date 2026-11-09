@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PNGInfo</title>
+  <title>PNGInfo v2</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <main class="app-shell">
     <header class="page-header">
       <div>
-        <h1>PNGInfo</h1>
+        <h1>PNGInfo <span class="version">v2</span></h1>
         <p>读取 PNG 元信息，整理提示词与生成参数。</p>
       </div>
       <span id="status" class="status" role="status">等待读取</span>
@@ -37,7 +37,7 @@
       <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="拖入 PNG 图片">
         <input id="file-input" type="file" accept="image/png,.png" hidden>
         <div class="drop-title">把 PNG 图片拖到这里</div>
-        <div class="drop-hint">也可以点击选择文件，读取 NovelAI、ComfyUI 等 PNG 元信息</div>
+        <div class="drop-hint">也可以点击选择文件 · NAI / ComfyUI / A1111 / Forge</div>
         <div id="selected-file" class="selected-file">尚未选择文件</div>
       </div>
 
@@ -49,11 +49,11 @@
 
     <section id="result-section" class="result-section is-hidden">
       <div class="result-heading">
-        <h2>读取结果</h2>
+        <h2>读取结果 <span id="source-label" class="source-badge"></span></h2>
         <button id="copy-button" class="text-button" type="button">复制结果</button>
       </div>
       <div id="categorized-result" class="categorized-result"></div>
-      <pre id="json-result" class="json-result is-hidden"></pre>
+      <div id="json-result" class="json-fields is-hidden"></div>
     </section>
 
     <section class="favorites-section">

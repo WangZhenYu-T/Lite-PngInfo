@@ -3,6 +3,7 @@
 import http.cookiejar
 import io
 import json
+import sqlite3
 from pathlib import Path
 import shutil
 import sys
@@ -55,7 +56,7 @@ class AppTests(unittest.TestCase):
             image.save(output, format="PNG", pnginfo=info)
         data = output.getvalue()
         result = self.request("/api/inspect", data)
-        self.assertEqual(result["metadata"]["generation"]["seed"], 42)
+        self.assertEqual(result["metadata"]["generation"]["seed"], "42")
         self.assertEqual(result["metadata"]["file"]["height"], 48)
         return data
 
@@ -89,6 +90,62 @@ class AppTests(unittest.TestCase):
         with caught.exception as response:
             self.assertEqual(response.code, 500)
             self.assertFalse(json.load(response)["ok"])
+
+    def test_failed_read_clears_previous_favoritable_image(self):
+        self.read_png()
+        with self.assertRaises(urllib.error.HTTPError):
+            self.request("/api/inspect", b"not a PNG")
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            self.request("/api/favorites", b"")
+        self.assertEqual(caught.exception.code, 409)
+
+    def test_empty_png_favorite(self):
+        output = io.BytesIO()
+        Image.new("RGB", (3, 5)).save(output, format="PNG")
+        result = self.request("/api/inspect", output.getvalue())
+        self.assertEqual(result["metadata"]["status"], "empty")
+        favorite_id = self.request("/api/favorites", b"")["id"]
+        saved = self.request(f"/api/favorites/{favorite_id}")
+        self.assertEqual(saved["metadata"]["entries"], [])
+        self.assertEqual(saved["favorite"]["source"]["label"], "无生成元信息")
+
+    def test_v1_favorite_upgrade_preserves_original_and_backup(self):
+        data = self.read_png()
+        favorite_id = self.request("/api/favorites", b"")["id"]
+        old_metadata = {"file": {"width": 32, "height": 48}, "raw": {"Comment": {"prompt": "old"}}}
+        with sqlite3.connect(app.DB_PATH) as db:
+            db.execute("UPDATE favorites SET metadata_json=?, prompt='old', created_at='original-date' WHERE id=?",
+                       (json.dumps(old_metadata), favorite_id))
+        listed = self.request("/api/favorites")["favorites"][0]
+        self.assertEqual(listed["source"]["family"], "legacy")
+        updated = self.request(f"/api/favorites/{favorite_id}")
+        self.assertEqual(updated["metadata"]["schema_version"], 2)
+        self.assertEqual(updated["metadata"]["generation"]["seed"], "42")
+        self.assertEqual(updated["favorite"]["created_at"], "original-date")
+        self.assertEqual(updated["favorite"]["id"], favorite_id)
+        with sqlite3.connect(app.DB_PATH) as db:
+            image, metadata = db.execute("SELECT image, metadata_json FROM favorites WHERE id=?", (favorite_id,)).fetchone()
+        self.assertEqual(image, data)
+        self.assertEqual(json.loads(metadata)["source"]["label"], "NAI")
+        backup = app.DB_PATH.with_name("favorites.before-v2.sqlite3")
+        with sqlite3.connect(backup) as db:
+            metadata = db.execute("SELECT metadata_json FROM favorites WHERE id=?", (favorite_id,)).fetchone()[0]
+        self.assertEqual(json.loads(metadata), old_metadata)
+        self.assertTrue(self.request("/api/favorites", b"")["already_exists"])
+
+    def test_unreadable_old_image_keeps_archived_result(self):
+        self.read_png()
+        favorite_id = self.request("/api/favorites", b"")["id"]
+        old = {"file": {"width": 32, "height": 48}, "raw": {"Comment": {"prompt": "archived"}},
+               "prompts": {"prompt": "archived", "negative_prompt": ""}}
+        with sqlite3.connect(app.DB_PATH) as db:
+            db.execute("UPDATE favorites SET metadata_json=?, image=? WHERE id=?",
+                       (json.dumps(old), b"broken", favorite_id))
+        result = self.request(f"/api/favorites/{favorite_id}")
+        self.assertEqual(result["metadata"]["prompts"]["prompt"], "archived")
+        self.assertEqual(result["metadata"]["entries"][0]["kind"], "archived")
+        with sqlite3.connect(app.DB_PATH) as db:
+            self.assertEqual(json.loads(db.execute("SELECT metadata_json FROM favorites").fetchone()[0]), old)
 
 
 if __name__ == "__main__":

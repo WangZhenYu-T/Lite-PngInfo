@@ -7,10 +7,8 @@ Then open http://127.0.0.1:8765 in a browser.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import http.cookies
-import io
 import json
 import mimetypes
 import os
@@ -25,7 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, UnidentifiedImageError
+from metadata import PARSER_VERSION, SCHEMA_VERSION, normalize_metadata
 
 
 ROOT = Path(__file__).resolve().parent
@@ -45,132 +43,9 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def json_safe(value: Any) -> Any:
-    """Convert Pillow values and arbitrary metadata into JSON-safe values."""
-    if isinstance(value, dict):
-        return {str(key): json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [json_safe(item) for item in value]
-    if isinstance(value, bytes):
-        return {"encoding": "base64", "value": base64.b64encode(value).decode("ascii")}
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    return str(value)
-
-
-def parse_json_text(value: Any) -> Any:
-    if not isinstance(value, str):
-        return value
-    try:
-        return json.loads(value)
-    except (TypeError, ValueError):
-        return value
-
-
-def extract_prompt(metadata: dict[str, Any]) -> str:
-    comment = metadata.get("Comment")
-    if isinstance(comment, dict):
-        return str(comment.get("prompt") or comment.get("positive_prompt") or "")
-    if isinstance(comment, str):
-        parsed = parse_json_text(comment)
-        if isinstance(parsed, dict):
-            return str(parsed.get("prompt") or parsed.get("positive_prompt") or "")
-        return comment
-    description = metadata.get("Description")
-    return str(description or "")
-
-
-def extract_negative_prompt(metadata: dict[str, Any]) -> str:
-    comment = metadata.get("Comment")
-    if isinstance(comment, dict):
-        return str(comment.get("uc") or comment.get("negative_prompt") or "")
-    if isinstance(comment, str):
-        parsed = parse_json_text(comment)
-        if isinstance(parsed, dict):
-            return str(parsed.get("uc") or parsed.get("negative_prompt") or "")
-    return ""
-
-
-def normalize_metadata(image_bytes: bytes, filename: str) -> dict[str, Any]:
-    try:
-        image = Image.open(io.BytesIO(image_bytes))
-        image.load()
-    except (UnidentifiedImageError, OSError) as exc:
-        raise ValueError("无法读取该文件，请确认它是有效的 PNG 图片。") from exc
-
-    if image.format != "PNG":
-        raise ValueError("PNGInfo 只接受 PNG 图片。")
-
-    raw_info = {str(key): json_safe(value) for key, value in image.info.items()}
-    for key in ("Comment", "Description"):
-        raw_info[key] = parse_json_text(raw_info.get(key))
-
-    comment = raw_info.get("Comment")
-    comment_json = comment if isinstance(comment, dict) else {}
-    prompt = extract_prompt(raw_info)
-    negative_prompt = extract_negative_prompt(raw_info)
-
-    core = {
-        "filename": filename,
-        "format": image.format,
-        "mode": image.mode,
-        "width": image.width,
-        "height": image.height,
-        "aspect_ratio": round(image.width / image.height, 6) if image.height else None,
-        "file_size_bytes": len(image_bytes),
-    }
-    generation = {
-        key: comment_json[key]
-        for key in (
-            "steps",
-            "height",
-            "width",
-            "scale",
-            "cfg_rescale",
-            "seed",
-            "sampler",
-            "noise_schedule",
-            "n_samples",
-            "model_name",
-            "model_hash",
-            "signed_hash",
-            "request_type",
-            "controlnet_strength",
-            "controlnet_model",
-            "dynamic_thresholding",
-            "version",
-        )
-        if key in comment_json
-    }
-
-    prompt_details = {
-        "prompt": prompt,
-        "negative_prompt": negative_prompt,
-        "v4_prompt": comment_json.get("v4_prompt"),
-        "v4_negative_prompt": comment_json.get("v4_negative_prompt"),
-    }
-
-    return {
-        "file": core,
-        "generation": generation,
-        "prompts": prompt_details,
-        "png_text": raw_info,
-        "raw": raw_info,
-    }
-
-
-def init_db() -> None:
-    ensure_database()
-
-
-def ensure_data_dir() -> None:
-    """Make database operations resilient if the data folder was removed."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-
 def ensure_database() -> None:
     """Create the database directory and schema when needed."""
-    ensure_data_dir()
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     with _db_lock, closing(sqlite3.connect(DB_PATH)) as db, db:
         db.execute(
             """
@@ -189,8 +64,8 @@ def ensure_database() -> None:
         db.execute("CREATE INDEX IF NOT EXISTS idx_favorites_sha256 ON favorites(sha256)")
 
 
-def favorite_summary(row: sqlite3.Row) -> dict[str, Any]:
-    metadata = json.loads(row["metadata_json"])
+def favorite_summary(row: sqlite3.Row, metadata: dict | None = None) -> dict[str, Any]:
+    metadata = metadata if metadata is not None else json.loads(row["metadata_json"])
     file_info = metadata.get("file", {})
     return {
         "id": row["id"],
@@ -198,7 +73,8 @@ def favorite_summary(row: sqlite3.Row) -> dict[str, Any]:
         "prompt": row["prompt"],
         "width": file_info.get("width"),
         "height": file_info.get("height"),
-        "file_size_bytes": len(row["image"]),
+        "source": metadata.get("source", {"family": "legacy", "label": "待更新分类"}),
+        "status": metadata.get("status", "legacy"),
         "created_at": row["created_at"],
     }
 
@@ -207,12 +83,42 @@ def list_favorites() -> list[dict[str, Any]]:
     ensure_database()
     with _db_lock, closing(sqlite3.connect(DB_PATH)) as db, db:
         db.row_factory = sqlite3.Row
-        rows = db.execute("SELECT * FROM favorites ORDER BY id DESC").fetchall()
+        rows = db.execute("SELECT id, filename, prompt, metadata_json, created_at FROM favorites ORDER BY id DESC").fetchall()
         return [favorite_summary(row) for row in rows]
 
 
+def favorite_metadata(row: sqlite3.Row) -> dict[str, Any]:
+    """Upgrade one saved result from its original PNG; keep a one-time SQLite backup."""
+    metadata = json.loads(row["metadata_json"])
+    if metadata.get("schema_version") == SCHEMA_VERSION and metadata.get("parser_version") == PARSER_VERSION:
+        return metadata
+    try:
+        updated = normalize_metadata(row["image"], row["filename"])
+    except ValueError:
+        # The archived result remains readable even if its stored PNG cannot be reparsed.
+        raw = metadata.get("raw", metadata.get("png_text", {}))
+        return {"file": metadata["file"], "source": {"family": "legacy", "label": "历史解析结果"},
+                "status": "unclassified", "generation": metadata.get("generation", {}),
+                "prompts": {**metadata.get("prompts", {}), "characters": []},
+                "models": [], "loras": [], "image_info": {},
+                "entries": [{"index": i, "key": key, "text": "", "kind": "archived",
+                             "formatted": json.dumps(value, ensure_ascii=False, indent=2)}
+                            for i, (key, value) in enumerate(raw.items())],
+                "notes": ["原图无法重新解析，正在显示历史结果；历史字段不提供复制原文。"]}
+    with _db_lock, closing(sqlite3.connect(DB_PATH)) as db:
+        backup = DB_PATH.with_name(DB_PATH.stem + ".before-v2.sqlite3")
+        if not backup.exists():
+            with closing(sqlite3.connect(backup)) as target:
+                db.backup(target)
+        with db:
+            db.execute("UPDATE favorites SET metadata_json = ?, prompt = ?, negative_prompt = ? WHERE id = ?",
+                       (json.dumps(updated, ensure_ascii=False), updated["prompts"]["prompt"],
+                        updated["prompts"]["negative_prompt"], row["id"]))
+    return updated
+
+
 class PNGInfoHandler(BaseHTTPRequestHandler):
-    server_version = "PNGInfo/1.0"
+    server_version = "PNGInfo/2.0"
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._session_cookie: str | None = None
@@ -287,6 +193,9 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
         return self.rfile.read(content_length)
 
     def inspect(self) -> None:
+        session_id = self.session_id()
+        with _session_lock:
+            _sessions[session_id] = {}
         try:
             image_bytes = self.read_request_body()
             filename = urllib.parse.unquote(self.headers.get("X-Filename", "image.png"))
@@ -295,10 +204,9 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
             self.send_error_json(str(exc))
             return
 
-        session_id = self.session_id()
         with _session_lock:
             _sessions[session_id] = {"image": image_bytes, "filename": filename, "metadata": metadata}
-        self.send_json({"ok": True, "metadata": metadata, "sha256": hashlib.sha256(image_bytes).hexdigest()})
+        self.send_json({"ok": True, "metadata": metadata})
 
     def reset(self) -> None:
         session_id = self.session_id()
@@ -377,7 +285,14 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(row["image"])
             return
-        self.send_json({"ok": True, "metadata": json.loads(row["metadata_json"]), "favorite": favorite_summary(row)})
+        try:
+            metadata = favorite_metadata(row)
+        except (OSError, sqlite3.Error):
+            self.send_error_json("收藏更新失败，原记录已保留，请重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        summary = favorite_summary(row, metadata)
+        summary["prompt"] = metadata["prompts"]["prompt"]
+        self.send_json({"ok": True, "metadata": metadata, "favorite": summary})
 
     def delete_favorite(self, path: str) -> None:
         pieces = path.strip("/").split("/")
@@ -419,8 +334,7 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    STATIC_DIR.mkdir(parents=True, exist_ok=True)
-    init_db()
+    ensure_database()
     server = ThreadingHTTPServer((HOST, PORT), PNGInfoHandler)
     print(f"PNGInfo running at http://{HOST}:{PORT}")
     try:
