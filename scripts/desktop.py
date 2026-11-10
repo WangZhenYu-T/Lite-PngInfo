@@ -30,8 +30,8 @@ def start_server(data_dir, port):
     app.DB_PATH = data_dir / "favorites.sqlite3"
     # v1 and v2 use the same database schema and server handler.
     data_dir.mkdir(parents=True, exist_ok=True)
-    app.init_db() if hasattr(app, "init_db") else app.ensure_database()
-    server = DesktopServer(("127.0.0.1", port), app.PNGInfoHandler)
+    app.ensure_database()
+    server = DesktopServer(("127.0.0.1", port), app.BunnyInfoHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, thread
@@ -49,7 +49,7 @@ def smoke_test(report):
     window.withdraw()
     window.update()
     window.destroy()
-    with tempfile.TemporaryDirectory(prefix="pnginfo-release-test-") as folder:
+    with tempfile.TemporaryDirectory(prefix="bunnyinfo-release-test-") as folder:
         server, thread = start_server(Path(folder), 0)
         base = f"http://127.0.0.1:{server.server_port}"
         client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(), urllib.request.ProxyHandler({}))
@@ -57,7 +57,8 @@ def smoke_test(report):
             with client.open(urllib.request.Request(base + path, data=data), timeout=10) as response:
                 return response.read()
         try:
-            assert b"PNGInfo" in request("/")
+            assert b"BunnyInfo" in request("/")
+            assert request("/static/favicon.ico")[:4] == b"\x00\x00\x01\x00"
             assert b"const state" in request("/static/app.js")
             assert json.loads(request("/api/health"))["ok"]
             # Generate a valid PNG with the bundled Pillow, not the build interpreter.
@@ -92,10 +93,11 @@ def main():
         smoke_test(options.smoke_test)
         return
     window = tk.Tk()
-    window.title("Lite-PngInfo")
+    window.title("BunnyInfo")
+    window.iconbitmap(str(Path(app.__file__).resolve().parent / "static/favicon.ico"))
     window.resizable(False, False)
     directory = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(app.__file__).resolve().parent
-    temporary = tempfile.TemporaryDirectory(prefix="pnginfo-launcher-test-") if options.launcher_test else None
+    temporary = tempfile.TemporaryDirectory(prefix="bunnyinfo-launcher-test-") if options.launcher_test else None
     data_dir = Path(temporary.name) / "data" if temporary else directory / "data"
     try:
         try:
@@ -106,11 +108,11 @@ def main():
                 raise
             server, thread = start_server(data_dir, 0)
     except (OSError, app.sqlite3.Error) as exc:
-        messagebox.showerror("Lite-PngInfo", f"Cannot start / 无法启动\n{exc}\n\nExtract to a writable folder.\n请完整解压到可写目录。")
+        messagebox.showerror("BunnyInfo", f"Cannot start / 无法启动\n{exc}\n\nExtract to a writable folder.\n请完整解压到可写目录。")
         window.destroy()
         return
     url = f"http://127.0.0.1:{server.server_port}"
-    tk.Label(window, text="Lite-PngInfo is running / 正在运行", font=("", 13)).pack(padx=28, pady=(20, 8))
+    tk.Label(window, text="BunnyInfo is running / 正在运行", font=("", 13)).pack(padx=28, pady=(20, 8))
     tk.Label(window, text=url).pack(padx=28, pady=4)
     tk.Label(window, text="Closing this window stops the app.\n关闭此窗口即可退出程序。", fg="#555555").pack(padx=28, pady=8)
     tk.Button(window, text="Open browser / 打开浏览器", command=lambda: webbrowser.open(url)).pack(pady=5)

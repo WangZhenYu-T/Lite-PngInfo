@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — BunnyInfo branding
+
+- Unified product, page, launcher, executable and package names as BunnyInfo; use the supplied Alice artwork for the executable, launcher and browser icons.
+- Refreshed the Chinese-first bilingual README with a logo header, real screenshots using synthetic metadata, and concise download/support sections.
+- Prepare manual release publishing after independent acceptance. Existing version tags and public release assets are not overwritten.
+- Preserve favorites paths/schema and existing environment/cookie compatibility; no v3 features are included.
+
 ## Desktop release packaging
 
 - Ready-to-run Windows x64 ZIPs for v1 and v2, including Python/Pillow, local-only server, automatic browser launch, and an Exit window.

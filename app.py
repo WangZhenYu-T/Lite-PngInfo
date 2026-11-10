@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A small, dependency-light PNGInfo web application.
+"""A small, dependency-light BunnyInfo web application.
 
 Run with: python app.py
 Then open http://127.0.0.1:8765 in a browser.
@@ -30,8 +30,8 @@ ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "favorites.sqlite3"
-HOST = os.environ.get("PNGINFO_HOST", "127.0.0.1")
-PORT = int(os.environ.get("PNGINFO_PORT", "8765"))
+HOST = os.environ.get("BUNNYINFO_HOST", os.environ.get("PNGINFO_HOST", "127.0.0.1"))
+PORT = int(os.environ.get("BUNNYINFO_PORT", os.environ.get("PNGINFO_PORT", "8765")))
 MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 
 _session_lock = threading.RLock()
@@ -117,8 +117,8 @@ def favorite_metadata(row: sqlite3.Row) -> dict[str, Any]:
     return updated
 
 
-class PNGInfoHandler(BaseHTTPRequestHandler):
-    server_version = "PNGInfo/2.0"
+class BunnyInfoHandler(BaseHTTPRequestHandler):
+    server_version = "BunnyInfo/2.0"
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._session_cookie: str | None = None
@@ -129,13 +129,13 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
 
     def session_id(self) -> str:
         cookies = http.cookies.SimpleCookie(self.headers.get("Cookie", ""))
-        session_id = cookies.get("pnginfo_session")
+        session_id = cookies.get("bunnyinfo_session") or cookies.get("pnginfo_session")
         if session_id and session_id.value in _sessions:
             return session_id.value
         session_id = secrets.token_urlsafe(18)
         with _session_lock:
             _sessions[session_id] = {}
-        self._session_cookie = f"pnginfo_session={session_id}; Path=/; SameSite=Lax"
+        self._session_cookie = f"bunnyinfo_session={session_id}; Path=/; SameSite=Lax"
         return session_id
 
     def send_json(self, payload: Any, status: int = HTTPStatus.OK) -> None:
@@ -155,13 +155,13 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/health":
-            self.send_json({"ok": True, "app": "pnginfo"})
+            self.send_json({"ok": True, "app": "bunnyinfo"})
             return
         if parsed.path == "/api/favorites":
             try:
                 self.send_json({"ok": True, "favorites": list_favorites()})
             except (OSError, sqlite3.Error):
-                self.send_error_json("收藏数据库暂时不可用，请重启 PNGInfo 后重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
+                self.send_error_json("收藏数据库暂时不可用，请重启 BunnyInfo 后重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
             return
         if parsed.path.startswith("/api/favorites/"):
             self.get_favorite(parsed.path)
@@ -252,7 +252,7 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
                 )
                 favorite_id = cursor.lastrowid
         except (OSError, sqlite3.Error):
-            self.send_error_json("收藏数据库暂时不可用，请重启 PNGInfo 后重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.send_error_json("收藏数据库暂时不可用，请重启 BunnyInfo 后重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
             return
         self.send_json({"ok": True, "id": favorite_id, "already_exists": False})
 
@@ -272,7 +272,7 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
                 db.row_factory = sqlite3.Row
                 row = db.execute("SELECT * FROM favorites WHERE id = ?", (favorite_id,)).fetchone()
         except (OSError, sqlite3.Error):
-            self.send_error_json("收藏数据库暂时不可用，请重启 PNGInfo 后重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.send_error_json("收藏数据库暂时不可用，请重启 BunnyInfo 后重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
             return
         if row is None:
             self.send_error_json("收藏记录不存在。", HTTPStatus.NOT_FOUND)
@@ -306,7 +306,7 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
             with _db_lock, closing(sqlite3.connect(DB_PATH)) as db, db:
                 cursor = db.execute("DELETE FROM favorites WHERE id = ?", (favorite_id,))
         except (OSError, sqlite3.Error):
-            self.send_error_json("收藏数据库暂时不可用，请重启 PNGInfo 后重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.send_error_json("收藏数据库暂时不可用，请重启 BunnyInfo 后重试。", HTTPStatus.INTERNAL_SERVER_ERROR)
             return
         if cursor.rowcount == 0:
             self.send_error_json("收藏记录不存在。", HTTPStatus.NOT_FOUND)
@@ -335,12 +335,12 @@ class PNGInfoHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     ensure_database()
-    server = ThreadingHTTPServer((HOST, PORT), PNGInfoHandler)
-    print(f"PNGInfo running at http://{HOST}:{PORT}")
+    server = ThreadingHTTPServer((HOST, PORT), BunnyInfoHandler)
+    print(f"BunnyInfo running at http://{HOST}:{PORT}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nPNGInfo stopped.")
+        print("\nBunnyInfo stopped.")
     finally:
         server.server_close()
 

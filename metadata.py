@@ -234,7 +234,7 @@ def normalize_metadata(image_bytes: bytes, filename: str) -> dict[str, Any]:
     try:
         with Image.open(io.BytesIO(image_bytes)) as image:
             if image.format != "PNG":
-                raise ValueError("PNGInfo 只接受 PNG 图片。")
+                raise ValueError("BunnyInfo 只接受 PNG 图片。")
             image.load()
             entries = read_entries(image_bytes)
             text_keys = {entry["key"] for entry in entries}

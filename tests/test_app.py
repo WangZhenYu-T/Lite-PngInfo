@@ -22,13 +22,13 @@ from PIL import Image, PngImagePlugin
 
 class AppTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="lite-pnginfo-test-")
+        self.temp = tempfile.TemporaryDirectory(prefix="bunnyinfo-test-")
         root = Path(self.temp.name)
         self.paths = patch.multiple(app, DATA_DIR=root / "data",
                                     DB_PATH=root / "data" / "favorites.sqlite3",
                                     _sessions={})
         self.paths.start()
-        self.server = app.ThreadingHTTPServer(("127.0.0.1", 0), app.PNGInfoHandler)
+        self.server = app.ThreadingHTTPServer(("127.0.0.1", 0), app.BunnyInfoHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.base = f"http://127.0.0.1:{self.server.server_port}"
@@ -91,6 +91,16 @@ class AppTests(unittest.TestCase):
         with caught.exception as response:
             self.assertEqual(response.code, 500)
             self.assertFalse(json.load(response)["ok"])
+
+    def test_brand_and_browser_icon(self):
+        self.assertEqual(self.request("/api/health")["app"], "bunnyinfo")
+        with self.client.open(self.base + "/") as response:
+            html = response.read().decode("utf-8")
+        self.assertIn("BunnyInfo v2", html)
+        self.assertIn('/static/favicon.ico', html)
+        with self.client.open(self.base + "/static/favicon.ico") as response:
+            with Image.open(io.BytesIO(response.read())) as icon:
+                self.assertEqual(icon.format, "ICO")
 
     def test_failed_read_clears_previous_favoritable_image(self):
         self.read_png()
