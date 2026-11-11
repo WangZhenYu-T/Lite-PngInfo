@@ -1,40 +1,29 @@
 # Changelog
 
-## Unreleased — BunnyInfo branding
+## v3
 
-- Unified product, page, launcher, executable and package names as BunnyInfo; use the supplied Alice artwork for the executable, launcher and browser icons.
-- Refreshed the Chinese-first bilingual README with a logo header, real screenshots using synthetic metadata, and concise download/support sections.
-- Prepare manual release publishing after independent acceptance. Existing version tags and public release assets are not overwritten.
-- Preserve favorites paths/schema and existing environment/cookie compatibility; no v3 features are included.
-
-## Desktop release packaging
-
-- Ready-to-run Windows x64 ZIPs for v1 and v2, including Python/Pillow, local-only server, automatic browser launch, and an Exit window.
-- Preserve version-specific application code, keep favorites beside the executable, and choose a free port if 8765 is occupied.
-- Test both built and extracted applications without a Python PATH; include version identifiers, dependency notices, and SHA-256 checksums.
-- Organize README as a complete English guide followed by the corresponding Chinese guide, with download-and-run instructions first.
-
-## v2 maintenance
-
-- Close SQLite connections explicitly in the two new favorite-upgrade tests so Windows can delete temporary database and backup files.
-- Run every CI matrix job to completion even if another fails, and add a v1/v2 comparison plus upgrade instructions to README.
-- Remove internal planning, development notes, and agent configuration from the distributed repository tree; keep them locally ignored.
+- Look up checkpoint and LoRA hashes on Civitai from inside the application, with verified matches linking to the exact model version.
+- Query individual models or batches with up to three concurrent requests, duplicate-hash handling and retry controls.
+- Distinguish missing or invalid hashes, unverified results, not-found responses, network failures, access restrictions and rate limits.
+- Inventory recognized checkpoint, LoRA and diffusion-model references across ComfyUI prompt graphs, editor workflows and serialized subgraphs. Include inactive nodes and preserve node origins without claiming the models were used in the image.
+- Reparse older favorites on demand, preserving original images, IDs and creation dates. Create a separate `favorites.before-v3.sqlite3` backup before writing upgraded results.
+- Adopt BunnyInfo branding, Alice artwork for the application/browser icons, and a Chinese-first bilingual guide. Historical v1/v2 packages retain their original names.
+- Improve proxy detection and startup from Windows/WSL source directories without moving the favorites database.
 
 ## v2
 
-- NAI, A1111, and Forge categorized metadata, recorded model/LoRA names and hashes, and NAI v4 character prompts.
-- Minimal ComfyUI classification: only prompts from a simple, unambiguous path; complex graph data remains in the JSON field browser.
-- Ordered PNG text entries, including duplicate keys, tEXt/zTXt/iTXt, and text after image data.
-- Per-field JSON formatting and original-text copying, ordered field export, and exact large integer seeds.
-- Explicit empty/unknown/partially parsed metadata states; valid metadata-free PNGs can still be previewed and favorited.
-- Source labels in favorites; on-demand v1 favorite reparse with a one-time SQLite backup before write-back.
-- Clear previous results when choosing/reading a new image; serialize browser session writes so reset and fast file changes remain consistent.
-- Remove duplicated raw/png_text payloads and avoid fetching image BLOBs for the favorites summary list.
+- Add NAI, A1111 and Forge categorized metadata, recorded model/LoRA names and hashes, and NAI character prompts.
+- Extract ComfyUI prompts from simple, unambiguous paths; preserve complex graph data in the JSON field browser.
+- Preserve ordered PNG text entries, duplicate keys, compressed text and text after image data.
+- Add per-field JSON formatting, original-text copying, ordered exports and exact large integer seeds.
+- Show explicit empty, unknown and partially parsed states. Valid PNGs without generation metadata can still be previewed and saved.
+- Add source labels in favorites and on-demand v1 favorite updates, with a SQLite backup before write-back.
+- Keep new-image and reset results consistent during rapid file changes.
+- Provide ready-to-run Windows x64 packages with a bundled runtime, automatic browser launch and a launcher window for exiting the app.
 
 ## v1
 
-- Local PNG metadata WebUI with categorized and JSON views.
-- NovelAI prompt and generation parameter extraction.
-- Optional preview, copy, reset, and SQLite favorites.
-- Linux/macOS shell launcher, native Windows BAT, and personal WSL launchers.
-- Isolated HTTP regression tests and Windows/Linux CI.
+- Local PNG metadata viewer with categorized and JSON views.
+- NAI prompt and generation-setting extraction.
+- Image preview, copying, reset and SQLite favorites containing original PNGs.
+- Python source launchers for Windows, Linux and macOS.

@@ -96,7 +96,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.request("/api/health")["app"], "bunnyinfo")
         with self.client.open(self.base + "/") as response:
             html = response.read().decode("utf-8")
-        self.assertIn("BunnyInfo v2", html)
+        self.assertIn("BunnyInfo v3", html)
         self.assertIn('/static/favicon.ico', html)
         with self.client.open(self.base + "/static/favicon.ico") as response:
             with Image.open(io.BytesIO(response.read())) as icon:
@@ -138,7 +138,7 @@ class AppTests(unittest.TestCase):
             image, metadata = db.execute("SELECT image, metadata_json FROM favorites WHERE id=?", (favorite_id,)).fetchone()
         self.assertEqual(image, data)
         self.assertEqual(json.loads(metadata)["source"]["label"], "NAI")
-        backup = app.DB_PATH.with_name("favorites.before-v2.sqlite3")
+        backup = app.DB_PATH.with_name("favorites.before-v3.sqlite3")
         with closing(sqlite3.connect(backup)) as db:
             metadata = db.execute("SELECT metadata_json FROM favorites WHERE id=?", (favorite_id,)).fetchone()[0]
         self.assertEqual(json.loads(metadata), old_metadata)
@@ -157,6 +157,51 @@ class AppTests(unittest.TestCase):
         self.assertEqual(result["metadata"]["entries"][0]["kind"], "archived")
         with closing(sqlite3.connect(app.DB_PATH)) as db:
             self.assertEqual(json.loads(db.execute("SELECT metadata_json FROM favorites").fetchone()[0]), old)
+
+    def test_lookup_does_not_replace_current_image_or_upload_metadata(self):
+        self.read_png()
+        with patch("civitai.lookup_hash", return_value={"state": "matched", "message": "已匹配"}) as lookup:
+            result = self.request("/api/models/lookup", json.dumps({"hash": "abcdef0123"}).encode())
+            self.assertEqual(result["result"]["state"], "matched")
+            self.request("/api/models/lookup", json.dumps({"hash": "ABCDEF0123"}).encode())
+            lookup.assert_called_once_with("ABCDEF0123")
+        favorite_id = self.request("/api/favorites", b"")["id"]
+        self.assertEqual(self.request(f"/api/favorites/{favorite_id}")["metadata"]["prompts"]["prompt"], "a landscape")
+
+    def test_lookup_boundary_and_empty_session_cannot_favorite(self):
+        with self.assertRaises(urllib.error.HTTPError):
+            self.request("/api/models/lookup", b'[]')
+        with patch("civitai.lookup_hash", return_value={"state": "invalid_hash", "message": "invalid"}):
+            result = self.request("/api/models/lookup", b'{"hash":"bad"}')
+        self.assertEqual(result["result"]["state"], "invalid_hash")
+        with self.assertRaises(urllib.error.HTTPError):
+            self.request("/api/favorites", b"")
+
+    def test_late_lookup_after_reset_does_not_recreate_session(self):
+        self.read_png()
+        self.request("/api/reset", b"")
+        with patch("civitai.lookup_hash", return_value={"state": "not_found"}):
+            request = urllib.request.Request(self.base + "/api/models/lookup", data=b'{"hash":"ABCDEF0123"}')
+            with self.client.open(request, timeout=5) as response:
+                self.assertNotIn("Set-Cookie", response.headers)
+        self.assertEqual(app._sessions, {})
+
+    def test_v2_favorite_reparsed_for_v3_inventory(self):
+        info = PngImagePlugin.PngInfo()
+        info.add_text("workflow", json.dumps({"nodes": [{"id": 1, "type": "LoraLoader", "mode": 4,
+                                                        "widgets_values": ["disabled.safetensors", 0, 0]}]}))
+        output = io.BytesIO()
+        Image.new("RGB", (3, 5)).save(output, format="PNG", pnginfo=info)
+        self.request("/api/inspect", output.getvalue())
+        favorite_id = self.request("/api/favorites", b"")["id"]
+        with closing(sqlite3.connect(app.DB_PATH)) as db, db:
+            metadata = json.loads(db.execute("SELECT metadata_json FROM favorites").fetchone()[0])
+            metadata["parser_version"] = "2.0"
+            metadata["loras"] = []
+            db.execute("UPDATE favorites SET metadata_json=?", (json.dumps(metadata),))
+        result = self.request(f"/api/favorites/{favorite_id}")
+        self.assertEqual(result["metadata"]["parser_version"], "3.0")
+        self.assertEqual(result["metadata"]["loras"][0]["name"], "disabled.safetensors")
 
 
 if __name__ == "__main__":

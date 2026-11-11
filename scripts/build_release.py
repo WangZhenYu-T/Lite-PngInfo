@@ -16,8 +16,9 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ["app.py", "metadata.py", "requirements.txt", "static/app.js", "static/index.html",
-         "static/style.css", "static/favicon.ico", "tests/test_app.py", "tests/test_metadata.py"]
+FILES = ["app.py", "metadata.py", "models.py", "civitai.py", "requirements.txt", "static/app.js", "static/index.html",
+         "static/style.css", "static/favicon.ico", "tests/test_app.py", "tests/test_metadata.py",
+         "tests/test_civitai.py", "tests/test_launchers.py", "scripts/windows_launcher.py"]
 
 
 def git(*args):

@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from metadata import PARSER_VERSION, SCHEMA_VERSION, normalize_metadata
+from civitai import LookupClient
 
 
 ROOT = Path(__file__).resolve().parent
@@ -37,6 +38,7 @@ MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 _session_lock = threading.RLock()
 _sessions: dict[str, dict[str, Any]] = {}
 _db_lock = threading.RLock()
+_lookup_client = LookupClient()
 
 
 def utc_now() -> str:
@@ -106,7 +108,7 @@ def favorite_metadata(row: sqlite3.Row) -> dict[str, Any]:
                             for i, (key, value) in enumerate(raw.items())],
                 "notes": ["原图无法重新解析，正在显示历史结果；历史字段不提供复制原文。"]}
     with _db_lock, closing(sqlite3.connect(DB_PATH)) as db:
-        backup = DB_PATH.with_name(DB_PATH.stem + ".before-v2.sqlite3")
+        backup = DB_PATH.with_name(DB_PATH.stem + ".before-v3.sqlite3")
         if not backup.exists():
             with closing(sqlite3.connect(backup)) as target:
                 db.backup(target)
@@ -118,7 +120,7 @@ def favorite_metadata(row: sqlite3.Row) -> dict[str, Any]:
 
 
 class BunnyInfoHandler(BaseHTTPRequestHandler):
-    server_version = "BunnyInfo/2.0"
+    server_version = "BunnyInfo/3.0"
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._session_cookie: str | None = None
@@ -170,6 +172,9 @@ class BunnyInfoHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/models/lookup":
+            self.lookup_model()
+            return
         if parsed.path == "/api/inspect":
             self.inspect()
             return
@@ -184,6 +189,27 @@ class BunnyInfoHandler(BaseHTTPRequestHandler):
             return
         self.send_error_json("接口不存在。", HTTPStatus.NOT_FOUND)
 
+    def lookup_model(self) -> None:
+        # The client supplies only a hash, never a destination URL or private image payload.
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 1024:
+                raise ValueError("查询请求大小无效。")
+            payload = json.loads(self.rfile.read(length))
+            if not isinstance(payload, dict) or not isinstance(payload.get("hash"), str):
+                raise ValueError("请提供模型哈希。")
+        except (ValueError, UnicodeError) as exc:
+            self.send_error_json(str(exc))
+            return
+        cookies = http.cookies.SimpleCookie(self.headers.get("Cookie", ""))
+        cookie = cookies.get("bunnyinfo_session") or cookies.get("pnginfo_session")
+        with _session_lock:
+            # A late lookup after Reset must not recreate a session or issue a replacement cookie.
+            session = _sessions.get(cookie.value) if cookie else None
+            cache = session.setdefault("lookup_cache", {}) if session is not None else {}
+        result = _lookup_client.query(payload["hash"], cache, retry=payload.get("retry") is True)
+        self.send_json({"ok": True, "result": result})
+
     def read_request_body(self) -> bytes:
         content_length = int(self.headers.get("Content-Length", "0"))
         if content_length <= 0:
@@ -195,7 +221,8 @@ class BunnyInfoHandler(BaseHTTPRequestHandler):
     def inspect(self) -> None:
         session_id = self.session_id()
         with _session_lock:
-            _sessions[session_id] = {}
+            cache = _sessions[session_id].get("lookup_cache", {})
+            _sessions[session_id] = {"lookup_cache": cache}
         try:
             image_bytes = self.read_request_body()
             filename = urllib.parse.unquote(self.headers.get("X-Filename", "image.png"))
@@ -205,7 +232,8 @@ class BunnyInfoHandler(BaseHTTPRequestHandler):
             return
 
         with _session_lock:
-            _sessions[session_id] = {"image": image_bytes, "filename": filename, "metadata": metadata}
+            _sessions[session_id] = {"image": image_bytes, "filename": filename, "metadata": metadata,
+                                     "lookup_cache": cache}
         self.send_json({"ok": True, "metadata": metadata})
 
     def reset(self) -> None:
@@ -218,7 +246,7 @@ class BunnyInfoHandler(BaseHTTPRequestHandler):
         session_id = self.session_id()
         with _session_lock:
             current = _sessions.get(session_id)
-        if not current:
+        if not current or "image" not in current:
             self.send_error_json("请先读取一张图片。", HTTPStatus.CONFLICT)
             return
 

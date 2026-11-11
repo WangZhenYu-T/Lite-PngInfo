@@ -13,6 +13,8 @@ from tkinter import messagebox
 import urllib.request
 import webbrowser
 
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app
 
 
@@ -78,23 +80,40 @@ def smoke_test(report):
             assert len(json.loads(request("/api/favorites"))["favorites"]) == 1
             assert json.loads(request(f"/api/favorites/{favorite}/delete", b""))["ok"]
             assert json.loads(request("/api/favorites"))["favorites"] == []
+            # Exercise bundled lookup plumbing without relying on external network availability.
+            import civitai
+            original_lookup = civitai.lookup_hash
+            try:
+                civitai.lookup_hash = lambda digest: {"state": "not_found", "message": "smoke test"}
+                result = json.loads(request("/api/models/lookup", b'{"hash":"ABCDEF0123"}'))
+                assert result["result"]["state"] == "not_found"
+            finally:
+                civitai.lookup_hash = original_lookup
         finally:
             stop_server(server, thread)
     Path(report).write_text(json.dumps({"ok": True, "checks": ["GUI runtime", "static assets", "health",
-        "PNG parse", "favorite roundtrip", "reset", "delete", "clean shutdown"]}), encoding="utf-8")
+        "PNG parse", "favorite roundtrip", "reset", "delete", "lookup endpoint", "clean shutdown"]}), encoding="utf-8")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke-test", metavar="REPORT")
     parser.add_argument("--launcher-test", metavar="REPORT")
+    parser.add_argument("--network-test", metavar="REPORT")
     options = parser.parse_args()
+    if options.network_test:
+        # Explicit diagnostic only; normal application startup never contacts Civitai.
+        import civitai
+        Path(options.network_test).write_text(json.dumps(civitai.lookup_hash("DC4C67171E")), encoding="utf-8")
+        return
     if options.smoke_test:
         smoke_test(options.smoke_test)
         return
     window = tk.Tk()
     window.title("BunnyInfo")
-    window.iconbitmap(str(Path(app.__file__).resolve().parent / "static/favicon.ico"))
+    icon_path = Path(app.__file__).resolve().parent / "static/favicon.ico"
+    if icon_path.is_file():
+        window.iconbitmap(str(icon_path))
     window.resizable(False, False)
     directory = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(app.__file__).resolve().parent
     temporary = tempfile.TemporaryDirectory(prefix="bunnyinfo-launcher-test-") if options.launcher_test else None
@@ -108,7 +127,11 @@ def main():
                 raise
             server, thread = start_server(data_dir, 0)
     except (OSError, app.sqlite3.Error) as exc:
-        messagebox.showerror("BunnyInfo", f"Cannot start / 无法启动\n{exc}\n\nExtract to a writable folder.\n请完整解压到可写目录。")
+        if isinstance(exc, app.sqlite3.OperationalError) and "locked" in str(exc).lower():
+            advice = "数据库被占用或共享文件系统不支持 SQLite 锁。\n源码位于 WSL 时请使用项目根目录的启动 BAT；Windows 发行包请完整解压到本地磁盘。"
+        else:
+            advice = "请确认程序目录可写，且数据库可正常访问。"
+        messagebox.showerror("BunnyInfo", f"Cannot start / 无法启动\n{exc}\n\n{advice}")
         window.destroy()
         return
     url = f"http://127.0.0.1:{server.server_port}"

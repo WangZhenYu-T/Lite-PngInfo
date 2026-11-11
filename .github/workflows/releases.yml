@@ -1,7 +1,9 @@
 name: Desktop Releases
 
-# Publication is an explicit maintainer action after independent acceptance testing.
+# v3 publication is explicitly authorized; other versions require manual dispatch.
 on:
+  push:
+    tags: ['v3']
   workflow_dispatch:
     inputs:
       tag:
@@ -23,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.tag || github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -35,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.tag || github.ref_name }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -44,13 +46,13 @@ jobs:
       - name: Validate release tag
         shell: bash
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           [[ "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+){0,2}(-[a-zA-Z0-9.]+)?$ ]]
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$(git rev-parse HEAD)"
       - name: Build and test extracted standalone application
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: python scripts/build_release.py --version "$env:RELEASE_TAG" --ref "$env:RELEASE_TAG" --output release-dist
       - uses: actions/upload-artifact@v4
         with:
@@ -69,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.tag || github.ref_name }}
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
@@ -78,14 +80,14 @@ jobs:
       - name: Publish and verify accepted release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         shell: bash
         run: |
           archive="BunnyInfo-${RELEASE_TAG}-Windows-x64.zip"
           (cd release-dist && sha256sum --check "$archive.sha256")
           # create fails if the release already exists; never replace accepted assets silently.
           gh release create "$RELEASE_TAG" "release-dist/$archive" "release-dist/$archive.sha256" \
-            --verify-tag --title "BunnyInfo $RELEASE_TAG" --notes-file releases/current.md
+            --verify-tag --title "BunnyInfo $RELEASE_TAG" --notes-file releases/current.md --latest
           gh release download "$RELEASE_TAG" --pattern "$archive*" --dir download-check
           (cd download-check && sha256sum --check "$archive.sha256")
           cmp "release-dist/$archive" "download-check/$archive"

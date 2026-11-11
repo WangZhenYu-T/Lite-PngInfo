@@ -4,6 +4,11 @@ const fileInput = $("#file-input");
 const dropZone = $("#drop-zone");
 let sessionQueue = Promise.resolve();
 let favoritesRequest = 0;
+const lookupQueue = [];
+let activeLookups = 0;
+let lookupResults = new Map();
+let lookupRunning = new Set();
+let lookupBatch = false;
 
 function setStatus(message, isError = false) {
   $("#status").textContent = message;
@@ -30,6 +35,9 @@ function sessionAction(action) {
 }
 
 function clearResult() {
+  lookupResults = new Map();
+  lookupRunning = new Set();
+  lookupBatch = false;
   state.metadata = null;
   state.canFavorite = false;
   if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
@@ -97,10 +105,20 @@ function renderCategorized(metadata) {
     html += promptCard(`角色 ${index + 1} · 正向提示词`, role.prompt, `characters.${index}.prompt`);
     html += promptCard(`角色 ${index + 1} · 负向提示词`, role.negative_prompt, `characters.${index}.negative_prompt`);
   });
-  if (models.length) html += card("模型 / Checkpoint", models.map((model) =>
-    renderFieldGrid({ "类型": model.type, "名称": model.name, "哈希": model.hash })).join(""), true);
-  if (loras.length) html += card("LoRA", loras.map((lora) =>
-    `<div class="model-item">${renderFieldGrid({ "名称": lora.name, "权重": lora.weight, "哈希": lora.hash })}</div>`).join(""), true);
+  if (models.length || loras.length) {
+    const inventory = metadata.source.family === "comfyui";
+    const notice = inventory ? '<p class="inventory-note">这是本 workflow 里所涉及的所有模型，不一定在启用状态，请自行在 ComfyUI 界面中确认。</p>' : "";
+    const entries = [...models, ...loras];
+    const list = entries.map((item, index) => {
+      const origins = item.origins?.map((origin) => `${origin.location} · 节点 ${origin.node_id}${origin.mode ? ` · mode=${origin.mode}` : ""}`).join("\n");
+      return `<div class="model-item">${renderFieldGrid({ "类型": item.type || "LoRA", "名称": item.name, "权重": item.weight, "哈希": item.hash })}
+        ${origins ? `<details><summary>节点来源（${item.origins.length}）</summary><pre class="model-origins">${escapeHtml(origins)}</pre></details>` : ""}
+        <div class="model-lookup" data-model-lookup="${index}"></div></div>`;
+    }).join("");
+    html += card(inventory ? "本工作流涉及的模型" : "模型与 LoRA", `${notice}
+      <p class="lookup-notice">点击查询时，仅将模型哈希发送至 Civitai，不上传图片或提示词。</p>
+      <div class="lookup-toolbar"><button class="button" type="button" id="lookup-all">查询全部</button><span id="lookup-summary" role="status"></span></div>${list}`, true);
+  }
   let message = "";
   if (metadata.status === "empty") message = "未发现生成元信息。可以预览或收藏这张图片。";
   else if (metadata.status === "unclassified") message = "存在元信息，暂无法分类。请选择 JSON 模式查看。";
@@ -134,8 +152,131 @@ function renderResults() {
   $("#json-result").classList.toggle("is-hidden", !isJson);
   $("#categorized-result").innerHTML = renderCategorized(state.metadata);
   $("#json-result").innerHTML = renderJson(state.metadata);
+  renderLookups();
   $("#copy-button").textContent = isJson ? "导出原始字段集合" : "复制分类结果";
   $("#copy-button").disabled = isJson && (!state.metadata.entries.length || state.metadata.entries.some((e) => e.kind === "archived"));
+}
+
+function modelItems() {
+  return [...state.metadata.models, ...state.metadata.loras];
+}
+
+function hashKey(item) {
+  return (item.hash || "").trim().toUpperCase();
+}
+
+function renderLookups() {
+  if (!state.metadata) return;
+  const items = modelItems();
+  items.forEach((item, index) => {
+    const element = $(`[data-model-lookup="${index}"]`);
+    if (!element) return;
+    const hash = hashKey(item);
+    if (!hash) {
+      element.innerHTML = '<span class="lookup-state">缺少哈希 · 无法按哈希查询</span>';
+      return;
+    }
+    const result = lookupResults.get(hash);
+    const running = lookupRunning.has(hash);
+    let html = result ? `<span class="lookup-state" data-state="${escapeHtml(result.state)}">${escapeHtml(result.message)}</span>` : '<span class="lookup-state">尚未查询</span>';
+    if (result?.state === "matched") {
+      // Model URLs are constructed from numeric IDs, never metadata text or remote HTML.
+      html += `<a class="text-button model-link" target="_blank" rel="noopener noreferrer" href="https://civitai.com/models/${Number(result.model_id)}?modelVersionId=${Number(result.version_id)}">${escapeHtml(result.model_name || "模型")} / ${escapeHtml(result.version_name || "版本")} · 打开模型</a>`;
+    }
+    const until = result?.retryUntil || 0;
+    const cooldown = Date.now() < until;
+    const text = running ? (result?.state === "queued" ? "排队中…" : "查询中…") : cooldown ? "稍后重试" : result?.state === "matched" ? "重新查询" : result ? "重试" : "查询";
+    html += `<button class="text-button" type="button" data-lookup-model="${index}" ${running || cooldown || lookupBatch || result?.state === "invalid_hash" ? "disabled" : ""}>${text}</button>`;
+    element.innerHTML = html;
+  });
+  const all = $("#lookup-all");
+  if (all) all.disabled = lookupBatch || lookupRunning.size > 0 || !items.some((item) => hashKey(item));
+  const summary = $("#lookup-summary");
+  if (summary) {
+    const counts = { matched: 0, not_found: 0, missing: 0, failure: 0, waiting: 0 };
+    for (const item of items) {
+      const hash = hashKey(item);
+      const result = lookupResults.get(hash);
+      if (!hash) counts.missing++;
+      else if (lookupRunning.has(hash)) counts.waiting++;
+      else if (result?.state === "matched") counts.matched++;
+      else if (result?.state === "not_found") counts.not_found++;
+      else if (result) counts.failure++;
+    }
+    summary.textContent = `共 ${items.length} 项 · 已匹配 ${counts.matched} · 未找到 ${counts.not_found} · 缺少哈希 ${counts.missing} · 失败 ${counts.failure}${counts.waiting ? ` · 等待 ${counts.waiting}` : ""}`;
+  }
+}
+
+function queryHash(hash, request, retry = false) {
+  if (lookupRunning.has(hash)) return Promise.resolve();
+  const results = lookupResults;
+  const running = lookupRunning;
+  running.add(hash);
+  results.set(hash, { state: "queued", message: "排队中" });
+  renderLookups();
+  const task = enqueueLookup(async () => {
+    if (request !== state.request || !state.metadata) return;
+    results.set(hash, { state: "querying", message: "正在查询 Civitai…" });
+    renderLookups();
+    try {
+      const response = await api("/api/models/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hash, retry }) });
+      if (request !== state.request) return;
+      const result = response.result;
+      if (result.retry_after) {
+        result.retryUntil = Date.now() + result.retry_after * 1000;
+        setTimeout(() => { if (request === state.request) renderLookups(); }, Math.min(result.retry_after * 1000 + 50, 2147483647));
+      }
+      results.set(hash, result);
+    } catch (error) {
+      if (request === state.request) results.set(hash, { state: "network_error", message: error.message || "本地查询服务不可用。" });
+    } finally {
+      running.delete(hash);
+      if (request === state.request) renderLookups();
+    }
+  });
+  return task;
+}
+
+function enqueueLookup(action) {
+  return new Promise((resolve, reject) => {
+    lookupQueue.push({ action, resolve, reject });
+    drainLookups();
+  });
+}
+
+function drainLookups() {
+  while (activeLookups < 3 && lookupQueue.length) {
+    const job = lookupQueue.shift();
+    activeLookups++;
+    Promise.resolve().then(job.action).then(job.resolve, job.reject).finally(() => {
+      activeLookups--;
+      drainLookups();
+    });
+  }
+}
+
+async function queryAllModels() {
+  if (!state.metadata || lookupBatch) return;
+  const request = state.request;
+  const hashes = [...new Set(modelItems().map(hashKey).filter(Boolean))];
+  lookupBatch = true;
+  renderLookups();
+  try {
+    let next = 0;
+    let limited = false;
+    async function worker() {
+      while (next < hashes.length && request === state.request && !limited) {
+        const hash = hashes[next++];
+        const previous = lookupResults.get(hash);
+        if (previous?.state === "matched" || Date.now() < (previous?.retryUntil || 0)) continue;
+        await queryHash(hash, request, !!previous);
+        if (lookupResults.get(hash)?.state === "rate_limited") limited = true;
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(3, hashes.length) }, () => worker()));
+  } finally {
+    if (request === state.request) { lookupBatch = false; renderLookups(); }
+  }
 }
 
 async function readFile() {
@@ -274,6 +415,12 @@ $("#copy-button").addEventListener("click", () => {
     ? entries.map(({ key, text }) => ({ key, text })) : categorized, null, 2));
 });
 $("#result-section").addEventListener("click", (event) => {
+  const lookup = event.target.closest("[data-lookup-model]");
+  if (lookup && state.metadata) {
+    const hash = hashKey(modelItems()[Number(lookup.dataset.lookupModel)]);
+    queryHash(hash, state.request, lookupResults.has(hash));
+  }
+  if (event.target.closest("#lookup-all")) queryAllModels();
   const entry = event.target.closest("[data-copy-entry]");
   const prompt = event.target.closest("[data-copy-prompt]");
   if (entry) copyText(state.metadata.entries[Number(entry.dataset.copyEntry)].text);

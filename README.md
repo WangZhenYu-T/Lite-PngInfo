@@ -4,124 +4,121 @@
 
 <img src="assets/bunnyinfo-alice-logo.jpeg" width="200" alt="BunnyInfo Logo">
 
-<p>面向 AI 绘图玩家的轻量 PNG 元信息工具。<br>查看提示词、生成参数和模型记录，把喜欢的图片留在本地。</p>
+<p>面向 AI 绘图玩家的轻量 PNG 元信息与模型溯源工具。<br>读取提示词与生成参数，按哈希找回 Civitai 上的 checkpoint 和 LoRA。<br><s>爱丽丝小兔包可爱捏</s></p>
 
 <p>
-  <a href="https://github.com/WangZhenYu-T/BunnyInfo/releases"><img src="https://img.shields.io/badge/version-v2-355f59" alt="Version v2"></a>
+  <a href="https://github.com/WangZhenYu-T/BunnyInfo/releases"><img src="https://img.shields.io/badge/version-v3-355f59" alt="Version v3"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078D4" alt="Windows 10/11 x64">
   <img src="https://img.shields.io/badge/local-first-a66a45" alt="Local first">
 </p>
 
-<p><strong><a href="https://github.com/WangZhenYu-T/BunnyInfo/releases">下载 Windows 版</a></strong> · <a href="CHANGELOG.md">更新记录</a> · <a href="#english">English</a></p>
+<p><strong><a href="https://github.com/WangZhenYu-T/BunnyInfo/releases">下载 Windows 版</a></strong> · <a href="CHANGELOG.md">更新记录</a> · <a href="https://github.com/WangZhenYu-T/BunnyInfo/issues">问题反馈</a> · <a href="#english">English</a></p>
 
 </div>
 
 ## 简体中文
 
-### 支持平台
+**你是否有时想查看某张图的画师串与提示词，却懒得打开webui/comfyui**
 
-- **Windows 10 / 11 x64**：解压即用，无需安装 Python 或配置环境。
-- **Linux / macOS**：可通过源码运行；当前自动测试覆盖 Windows 和 Ubuntu。
-- 当前支持 **PNG，最大 30 MB**。界面使用中文。
+**你是否遇见一些好图，想找到lora的来源，却懒得一个个搜**
+
+**你是否会对roll出的个别作品及其提示词特别满意，需要收藏起来**
+
+**那么这款主打轻量化的元信息提取工具就非常适合你！！！**
+
+### 功能
+
+- **分类模式**：读取 NAI、A1111、Forge 的正负提示词、生成参数与模型记录，支持 NAI 角色提示词。
+- **JSON 模式**：格式化浏览字段、逐项复制原文或导出字段集合，保留重复文本字段和大整数 seed 精度。
+- **Civitai 模型定向检索查询**：按图片中记录的模型哈希查询 checkpoint 和 LoRA，在应用内显示匹配结果，一键打开对应版本。
+- **本地收藏**：保存原始图片与解析结果；没有生成元信息的 PNG 也能预览和收藏。同时支持将收藏图片重载。
+- **支持关闭图片显示**：带来更好的隐私体验
 
 ### 屏幕截图
 
 <table>
   <tr>
-    <td><img src="assets/screenshots/reader.png" alt="图片读取与预览"><p align="center">图片读取与预览</p></td>
-    <td><img src="assets/screenshots/classified.png" alt="提示词与模型记录"><p align="center">提示词与模型记录</p></td>
+    <td width="50%"><a href="assets/未读取状态.png"><img src="assets/未读取状态.png" alt="BunnyInfo 主界面"></a><p align="center">主界面</p></td>
+    <td width="50%"><a href="assets/读取到的元信息.png"><img src="assets/读取到的元信息.png" alt="生成参数与提示词"></a><p align="center">生成参数与提示词</p></td>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/json.png" alt="JSON 与原文复制"><p align="center">JSON 与原文复制</p></td>
-    <td><img src="assets/screenshots/favorites.png" alt="本地收藏"><p align="center">本地收藏</p></td>
+    <td><a href="assets/模型哈希检索.png"><img src="assets/模型哈希检索.png" alt="Civitai 模型哈希查询"></a><p align="center">Civitai 模型检索</p></td>
+    <td><a href="assets/收藏栏.png"><img src="assets/收藏栏.png" alt="本地图片收藏"></a><p align="center">本地收藏</p></td>
   </tr>
 </table>
 
-### 功能
-
-- **分类阅读**：整理 NAI、A1111、Forge 的正负提示词、生成参数，以及图片中记录的 checkpoint / LoRA 信息；支持 NAI 角色提示词。
-- **原文保留**：按字段格式化 JSON、复制原始文本或导出字段集合，保留重复文本键、压缩文本与大整数 seed 精度。
-- **ComfyUI 提示词**：仅从简单、明确的连接提取；复杂 prompt 图和 workflow 在 JSON 中查看，也可将图片直接拖入 ComfyUI。
-- **本地收藏**：保存原始 PNG 和解析结果，显示来源标识。无生成元信息的 PNG 同样可以预览和收藏。
-- **轻量即用**：桌面包自带运行环境，通过浏览器使用，关闭启动窗口即可退出。
-
-| 来源 | v2 分类内容 | 原始字段 |
-|---|---|---|
-| NAI | 正负及角色提示词、可用参数、模型信息 | 保留 |
-| A1111 / Forge | 提示词、参数、已记录的 checkpoint、LoRA 与哈希 | 保留 |
-| ComfyUI | 简单且无歧义的保存路径所对应的提示词 | 保留 prompt 图及内嵌 workflow |
-| 其他 PNG | 图片信息、未识别或空状态 | 展示可用文本 |
-
-图片未保存的信息无法恢复。ComfyUI 分类不推断工作流中哪些节点启用；v2 尚不包含模型盘点和 Civitai 哈希查询。
-
 ### 下载与使用
 
-在 **[Releases](https://github.com/WangZhenYu-T/BunnyInfo/releases)** 下载 Windows ZIP。
+在 **[Releases](https://github.com/WangZhenYu-T/BunnyInfo/releases)** 下载 **BunnyInfo-v3-Windows-x64.zip**，支持 Windows 10 / 11（64 位）。无需安装 Python 或配置依赖。
 
-**已发布的 v1 / v2 保留旧名称**：附件分别为 `Lite-PngInfo-v1-Windows-x64.zip`、`Lite-PngInfo-v2-Windows-x64.zip`，包内程序为 `Lite-PngInfo.exe`。它们是本项目的历史发行包，无需改名；后续新包统一使用 BunnyInfo。
+1. 将 ZIP **完整解压到本地可写目录**。
+2. 双击 **BunnyInfo.exe**，浏览器自动打开。
+3. 选择或拖入 PNG，点击 **读取**；切换分类 / JSON 查看信息，或点击 **收藏当前** 保存图片。
+4. 在模型条目中点击 **查询**，或使用 **查询全部**；匹配成功后点击 **打开模型** 进入对应的 Civitai 版本页。
 
-1. **完整解压**到可写目录，例如桌面。
-2. 双击 **Lite-PngInfo.exe**（v1 / v2 历史包；后续新包为 **BunnyInfo.exe**），浏览器自动打开。
-3. 选择或拖入 PNG，点击 **读取**；按需切换分类 / JSON 模式或收藏图片。
+保留 exe 旁的 `_internal` 文件夹，不要直接在压缩包中运行。关闭启动窗口即可退出程序；关闭网页不会停止服务。默认端口被占用时，桌面版会自动选择空闲端口。
 
-请保留 exe 旁的 `_internal` 文件夹，不要直接在 ZIP 内运行。启动窗口提供“打开浏览器”和“退出”按钮；关闭网页不会停止程序，关闭启动窗口才会退出。默认端口被占用时会自动选择空闲端口。
+v1 / v2 历史发行包保留原名称：`Lite-PngInfo-v1-Windows-x64.zip`、`Lite-PngInfo-v2-Windows-x64.zip`，包内程序为 `Lite-PngInfo.exe`。
 
-### 版本与计划
+### 格式支持
 
-| 版本 | 主要内容 |
-|---|---|
-| v1 | NAI 元信息、JSON、预览与本地收藏。 |
-| v2 | 增加 A1111 / Forge 分类、保守的 ComfyUI 提示词提取、原始字段浏览、角色提示词与明确空状态。 |
-| v3 · 计划 | ComfyUI workflow 模型盘点、Civitai 后台哈希查询。尚未实现。 |
+当前读取 **PNG，最大 30 MB**，界面使用中文。
 
-收藏大图查看器保留为后续可选增强。已发布变更见 [CHANGELOG.md](CHANGELOG.md)。
+| 来源            | 分类内容                            | 原始字段                    |
+| ------------- | ------------------------------- | ----------------------- |
+| NAI           | 正负及角色提示词、可用生成参数、模型信息            | 保留                      |
+| A1111 / Forge | 提示词、参数、已记录的 checkpoint、LoRA 与哈希 | 保留                      |
+| ComfyUI       | 可以可靠提取的提示词，以及已识别的工作流模型引用        | 保留 prompt 图和内嵌 workflow |
+| 其他 PNG        | 图片信息、未识别或无元信息提示                 | 展示可用文本                  |
 
-### 数据与隐私
+ComfyUI 模型列表包含工作流中记录的模型，**不代表它们处于启用状态**，请在 ComfyUI 中确认。自定义节点或动态文件名可能无法识别；完整工作流可在 JSON 中查看，或将图片直接拖入 ComfyUI。
 
-v2 的图片解析与收藏在本机完成，不向外部服务上传图片或提示词，无需账号，读取可离线进行。应用只监听本机地址。
+图片未保存的信息无法恢复。只有模型名称、没有模型哈希的条目会显示“缺少哈希”，不能按哈希检索。Civitai 未收录、已删除或不可见的模型版本也可能无法找到。
 
-收藏位于程序旁的 `data/favorites.sqlite3`。移动程序或升级时，**先退出程序，备份并携带整个 `data/` 文件夹**。打开旧收藏时，v2 会按需更新解析结果；首次写回升级结果前创建 `data/favorites.before-v2.sqlite3`。解除收藏只修改当前数据库，不会同步删除旧备份中的副本。回退旧版时请使用原数据库的独立副本。
+### 本地数据与隐私
+
+图片解析和收藏在本机完成，无需账号，读取图片可离线进行。**只有点击模型查询时才连接 Civitai**，发送模型哈希，不上传图片、提示词或完整工作流。Civitai 会收到查询哈希和来源 IP。
+
+收藏保存在程序旁的 `data/favorites.sqlite3`。升级或移动程序前，请先退出应用，备份并携带整个 `data/` 文件夹。v3 打开旧收藏时按需更新解析结果，首次写回前创建 `data/favorites.before-v3.sqlite3`，原有图片、收藏 ID 和创建时间保留。
+
+解除收藏只修改当前数据库，不删除旧备份中的副本。查询缓存只保存在会话中，重置后清除，不写入收藏库。回退旧版时请使用原数据库的独立副本。
 
 ### 常见问题
 
 <details>
-<summary>Windows 提示未知发布者怎么办？</summary>
+<summary>为什么查询失败，但浏览器能打开 Civitai？</summary>
 
-当前程序未做代码签名，Windows 可能显示发布者或信誉提示。请确认文件来自本仓库的 Release；页面附有 SHA-256 校验文件。受组织管理的电脑可能限制未签名程序运行。
-
-</details>
-
-<details>
-<summary>为什么读不到提示词或模型？</summary>
-
-部分图片没有保存生成信息，转存、截图或平台压缩也可能移除元信息。程序仍会显示图片信息与可用的原始字段。ComfyUI 复杂图默认留在 JSON，不将旁支数据猜作当前图片的生成参数。
+浏览器和本地程序可能使用不同的网络或代理设置。请查看模型条目旁的具体错误；如果访问 Civitai 需要代理，请确认系统代理已正确配置。网络失败、访问受限和限流会分别提示，不等同于“模型不存在”；限流时请稍后重试。
 
 </details>
 
 <details>
-<summary>源码运行与开发</summary>
+<summary>Windows 为什么提示未知发布者？</summary>
 
-需要 Python 3.10+ 和 Pillow，无需前端构建。使用虚拟环境安装依赖：
+当前程序未做代码签名，Windows 可能显示发布者或信誉提示。请从本仓库的 Release 下载，页面附有 SHA-256 校验文件。
+
+</details>
+
+<details>
+<summary>源码运行</summary>
+
+Linux / macOS 可使用源码运行，需要 Python 3.10+ 和 Pillow，无需前端构建。
 
 ```sh
-python -m venv .venv
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python app.py
 ```
 
 Windows：
 
 ```bat
+py -3 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python app.py
 ```
 
-Linux / macOS（可用 `python3` 创建虚拟环境）：
-
-```sh
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python app.py
-```
-
-打开 <http://127.0.0.1:8765>，按 Ctrl+C 停止。源码支持 `BUNNYINFO_HOST`、`BUNNYINFO_PORT`，默认仅监听本机，未提供用户认证。使用同一解释器运行 `-m unittest discover -s tests -v`；测试采用合成图片、临时数据库和端口，CI 覆盖 Windows / Ubuntu × Python 3.10 / 3.13。
+打开 <http://127.0.0.1:8765>，按 Ctrl+C 停止。源码支持 `BUNNYINFO_HOST`、`BUNNYINFO_PORT`，默认只监听本机，未提供用户认证。Windows 源码位于 WSL 共享目录时，使用项目根目录的启动 BAT，避免跨系统访问 SQLite 数据库。
 
 </details>
 
@@ -129,111 +126,106 @@ Linux / macOS（可用 `python3` 创建虚拟环境）：
 
 ## English
 
-BunnyInfo is a lightweight PNG metadata viewer for AI image creators. Read prompts, generation settings, and recorded model information, and keep favorite images locally.
+**Ever wanted to check an image's artist tags and prompts without opening WebUI or ComfyUI?**
 
-### Platforms
+**Found a great image and wanted to find its LoRA sources without searching for each one?**
 
-- **Windows 10 / 11 x64**: extract and run, with no Python installation or setup.
-- **Linux / macOS**: run from source. Automated tests currently cover Windows and Ubuntu.
-- Supports **PNG files up to 30 MB**. The interface is in Chinese.
+**Created an image whose result and prompts you particularly liked, and wanted to save it?**
+
+**Then this lightweight metadata reader is for you!**
+
+### Features
+
+- **Categorized view**: read NAI, A1111 and Forge positive/negative prompts, generation settings and model records, including NAI character prompts.
+- **JSON view**: browse formatted fields, copy original text or export field collections, preserving duplicate text fields and large integer seeds.
+- **Civitai model lookup**: query checkpoint and LoRA hashes recorded in images, see matches in the app, and open the corresponding version.
+- **Local favorites**: save original images and parsed metadata, including PNGs without generation metadata. Reload saved images when needed.
+- **Hide image previews**: turn off image display for more privacy.
 
 ### Screenshots
 
 <table>
   <tr>
-    <td><img src="assets/screenshots/reader.png" alt="Image reader and preview"><p align="center">Image reader and preview</p></td>
-    <td><img src="assets/screenshots/classified.png" alt="Prompts and model information"><p align="center">Prompts and model information</p></td>
+    <td width="50%"><a href="assets/未读取状态.png"><img src="assets/未读取状态.png" alt="BunnyInfo main interface"></a><p align="center">Main interface</p></td>
+    <td width="50%"><a href="assets/读取到的元信息.png"><img src="assets/读取到的元信息.png" alt="Generation settings and prompts"></a><p align="center">Settings and prompts</p></td>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/json.png" alt="JSON and original text"><p align="center">JSON and original text</p></td>
-    <td><img src="assets/screenshots/favorites.png" alt="Local favorites"><p align="center">Local favorites</p></td>
+    <td><a href="assets/模型哈希检索.png"><img src="assets/模型哈希检索.png" alt="Civitai hash lookup results"></a><p align="center">Civitai model lookup</p></td>
+    <td><a href="assets/收藏栏.png"><img src="assets/收藏栏.png" alt="Local image favorites"></a><p align="center">Local favorites</p></td>
   </tr>
 </table>
 
-### Features
-
-- **Categorized metadata**: NAI, A1111, and Forge prompts, settings, and recorded checkpoint / LoRA information, including NAI character prompts.
-- **Original text**: formatted JSON fields, original-text copying, and ordered field exports. Duplicate keys, compressed text, and large integer seeds are preserved.
-- **Conservative ComfyUI parsing**: prompts from simple, unambiguous paths. Inspect complex prompt graphs and workflows in JSON or drop the PNG into ComfyUI.
-- **Local favorites**: store original PNGs and metadata with source labels. Images without generation metadata can also be previewed and saved.
-- **Portable desktop app**: bundled runtime, a browser interface, and a small launcher window to open or stop the app.
-
-| Source | v2 categorized view | Original fields |
-|---|---|---|
-| NAI | Positive/negative and character prompts, available settings and model information | Preserved |
-| A1111 / Forge | Prompts, settings, recorded checkpoints, LoRAs and hashes | Preserved |
-| ComfyUI | Prompts from a simple, unambiguous saved-image path | Prompt graph and embedded workflow preserved |
-| Other PNGs | Image details and an unrecognized/empty state | Available text |
-
-Information not stored in the image cannot be recovered. ComfyUI classification does not infer active nodes. Model inventory and Civitai hash lookup are not included in v2.
-
 ### Download and use
 
-Download a Windows ZIP from **[Releases](https://github.com/WangZhenYu-T/BunnyInfo/releases)**.
+Download **BunnyInfo-v3-Windows-x64.zip** from **[Releases](https://github.com/WangZhenYu-T/BunnyInfo/releases)** for Windows 10 / 11 (64-bit). No Python installation or dependency setup is required.
 
-**Published v1 / v2 packages retain their original names**: `Lite-PngInfo-v1-Windows-x64.zip` and `Lite-PngInfo-v2-Windows-x64.zip`, containing `Lite-PngInfo.exe`. These are this project's historical releases; no renaming is needed. Future packages use BunnyInfo.
+1. **Extract the entire ZIP to a writable local folder.**
+2. Open **BunnyInfo.exe**; your browser opens automatically.
+3. Choose or drop a PNG and click **读取** (Read). Switch between categorized / JSON views, or select **收藏当前** to save a favorite.
+4. Click **查询** (Query) on a model or **查询全部** (Query all). A verified result offers **打开模型** (Open model), linking to the exact Civitai version.
 
-1. **Extract the entire ZIP** to a writable folder.
-2. Open **Lite-PngInfo.exe** for the v1 / v2 packages (**BunnyInfo.exe** for future packages); your browser opens automatically.
-3. Choose or drop a PNG and click **读取** (Read). Switch between categorized / JSON views or save a favorite.
+Keep `_internal` beside the executable and do not run inside the ZIP. Close the launcher window to exit; closing the web page does not stop the service. The desktop app chooses a free port if the default port is occupied.
 
-Keep `_internal` beside the executable and do not run inside the ZIP. The launcher provides Open browser and Exit buttons. Closing the web page does not stop the app; close the launcher to exit. An available port is chosen when the default port is occupied.
+Historical v1 / v2 packages retain their original names: `Lite-PngInfo-v1-Windows-x64.zip` and `Lite-PngInfo-v2-Windows-x64.zip`, containing `Lite-PngInfo.exe`.
 
-### Versions and plans
+### Format support
 
-| Version | Highlights |
-|---|---|
-| v1 | NAI metadata, JSON, preview, and local favorites. |
-| v2 | A1111 / Forge classification, conservative ComfyUI prompts, original fields, character prompts, and explicit empty states. |
-| v3 · Planned | ComfyUI workflow model inventory and background Civitai hash lookup. Not implemented. |
+Supports **PNG files up to 30 MB**. The interface is in Chinese.
 
-The independent favorite-image viewer remains an optional future enhancement. Released changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+| Source        | Categorized view                                                                  | Original fields                              |
+| ------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
+| NAI           | Positive/negative and character prompts, available settings and model information | Preserved                                    |
+| A1111 / Forge | Prompts, settings, recorded checkpoints, LoRAs and hashes                         | Preserved                                    |
+| ComfyUI       | Reliably extracted prompts and recognized workflow model references               | Prompt graph and embedded workflow preserved |
+| Other PNGs    | Image details and unrecognized / empty metadata feedback                          | Available text                               |
 
-### Data and privacy
+ComfyUI inventory includes models recorded in the workflow, **not confirmed active models**. Check their status in ComfyUI. Custom nodes and dynamic filenames may not be recognized; inspect the full workflow in JSON or drop the image into ComfyUI.
 
-v2 parses images and stores favorites locally. It does not upload images or prompts to an external service, needs no account, and reads images offline. The application binds only to localhost.
+Information absent from the image cannot be recovered. Filename-only references display “Missing hash” and cannot be looked up by hash. Model versions that are absent from, deleted from or not visible on Civitai may not be found.
 
-Favorites are stored beside the application in `data/favorites.sqlite3`. **Close the app, back up, and carry the entire `data/` folder when moving or upgrading.** v2 reparses old favorites on demand and creates `data/favorites.before-v2.sqlite3` before the first upgraded result is written back. Deleting a favorite changes the active database, not older backups. Use a separate original database copy when reverting to an older version.
+### Local data and privacy
+
+PNG parsing and favorites stay local, require no account and work offline. **Civitai is contacted only when you request a lookup.** Only model hashes are sent, not images, prompts or full workflows. Civitai receives the hash and source IP.
+
+Favorites are stored beside the executable in `data/favorites.sqlite3`. Close the app and back up the entire `data/` folder before moving or upgrading. v3 reparses old favorites on demand, creating `data/favorites.before-v3.sqlite3` before the first write-back. Original images, IDs and creation dates are preserved.
+
+Deleting a favorite changes the active database, not older backups. Lookup caches are session-only, cleared by Reset and not stored in favorites. Use a separate original database copy when reverting to an older version.
 
 ### FAQ
 
 <details>
+<summary>Why does lookup fail when Civitai opens in my browser?</summary>
+
+The browser and application may use different network or proxy settings. Check the specific error beside the model. If your connection requires a proxy to access Civitai, make sure the system proxy is configured correctly. Network errors, access restrictions and rate limits are reported separately; none implies that the model does not exist. Wait before retrying a rate-limited request.
+
+</details>
+
+<details>
 <summary>Why does Windows report an unknown publisher?</summary>
 
-The executable is unsigned, so Windows may display a publisher or reputation warning. Download from this repository's Releases; SHA-256 checksum files are provided. Organization-managed computers may restrict unsigned applications.
+The executable is unsigned, so Windows may display a publisher or reputation warning. Download from this repository's Releases, which include SHA-256 checksum files.
 
 </details>
 
 <details>
-<summary>Why are prompts or models missing?</summary>
+<summary>Run from source</summary>
 
-Some images contain no generation metadata. Re-saving, screenshots, or platform processing may remove it. Image details and available original fields remain accessible. Complex ComfyUI graphs stay in JSON rather than presenting unrelated branches as the current image's settings.
-
-</details>
-
-<details>
-<summary>Run from source and development</summary>
-
-Requires Python 3.10+ and Pillow; no frontend build is needed. Create a virtual environment:
+Linux / macOS source runs require Python 3.10+ and Pillow. No frontend build is needed.
 
 ```sh
-python -m venv .venv
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python app.py
 ```
 
 Windows:
 
 ```bat
+py -3 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python app.py
 ```
 
-Linux / macOS (use `python3` to create the environment where needed):
-
-```sh
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python app.py
-```
-
-Open <http://127.0.0.1:8765>; press Ctrl+C to stop. Source runs accept `BUNNYINFO_HOST` and `BUNNYINFO_PORT`, default to localhost, and have no user authentication. Run `-m unittest discover -s tests -v` with the same interpreter. Tests use synthetic images and temporary databases/ports; CI covers Windows / Ubuntu × Python 3.10 / 3.13.
+Open <http://127.0.0.1:8765>; press Ctrl+C to stop. Source runs accept `BUNNYINFO_HOST` and `BUNNYINFO_PORT`, default to localhost and have no user authentication. When Windows source files reside on a WSL share, use the root startup BAT to avoid accessing SQLite across operating systems.
 
 </details>

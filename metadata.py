@@ -12,9 +12,10 @@ import zlib
 from typing import Any
 
 from PIL import Image, PngImagePlugin, UnidentifiedImageError
+from models import comfy_inventory
 
 SCHEMA_VERSION = 2
-PARSER_VERSION = "2.0"
+PARSER_VERSION = "3.0"
 
 
 def json_safe(value: Any) -> Any:
@@ -270,6 +271,10 @@ def normalize_metadata(image_bytes: bytes, filename: str) -> dict[str, Any]:
     elif (isinstance(fields.get("prompt"), dict) and any(
             isinstance(n, dict) and "class_type" in n for n in fields["prompt"].values())) or "workflow" in fields:
         comfy_metadata(fields.get("prompt"), result)
+        inventory = comfy_inventory(fields.get("prompt"), fields.get("workflow"), result["notes"])
+        result["models"] = [item for item in inventory if item["type"] != "LoRA"]
+        result["loras"] = [item for item in inventory if item["type"] == "LoRA"]
+        result["notes"].append("这是本 workflow 里所涉及的所有模型，不一定在启用状态，请自行在 ComfyUI 界面中确认。")
         if "workflow" not in fields:
             result["notes"].append("本图未记录 workflow 字段。")
     if result["source"]["family"] != "unknown":

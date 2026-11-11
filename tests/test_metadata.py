@@ -156,6 +156,45 @@ class MetadataTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             normalize_metadata(output.getvalue(), "fake.png")
 
+    def test_inventory_includes_inactive_editor_and_subgraph_models(self):
+        workflow = {"nodes": [
+            {"id": 1, "type": "CheckpointLoaderSimple", "widgets_values": ["a/base.safetensors"], "mode": 2},
+            {"id": 2, "type": "LoraLoader", "widgets_values": ["style.safetensors", 0, 0], "mode": 4},
+            {"id": 3, "type": "UNETLoader", "widgets_values": ["diffusion.safetensors", "default"]}],
+            "definitions": {"subgraphs": [{"nodes": [
+                {"id": 1, "type": "CheckpointLoader", "widgets_values": ["config.yaml", "b/base.safetensors"]}]}]}}
+        graph = {"2": {"class_type": "LoraLoader", "inputs": {"lora_name": "style.safetensors",
+                 "model_hash": "ABCDEF0123", "strength_model": 0.5}}}
+        result = self.inspect([("prompt", graph), ("workflow", workflow)])
+        self.assertEqual([v["name"] for v in result["models"]],
+                         ["a/base.safetensors", "diffusion.safetensors", "b/base.safetensors"])
+        self.assertEqual(len(result["loras"]), 1)
+        self.assertEqual(result["loras"][0]["hash"], "ABCDEF0123")
+        self.assertEqual(len(result["loras"][0]["origins"]), 2)
+        self.assertTrue(any("不一定在启用状态" in n for n in result["notes"]))
+        self.assertEqual(result["generation"], {})
+
+    def test_inventory_conflicts_dynamic_and_unknown_nodes(self):
+        graph = {"1": {"class_type": "LoraLoader", "inputs": {"lora_name": "same.safetensors", "hash": "11111111"}},
+                 "2": {"class_type": "LoraLoader", "inputs": {"lora_name": "same.safetensors", "hash": "22222222"}}}
+        workflow = {"nodes": [
+            {"id": 3, "type": "LoraLoader", "widgets_values": ["same.safetensors"]},
+            {"id": 4, "type": "LoraLoader", "inputs": [{"name": "lora_name", "link": 7}], "widgets_values": ["stale.safetensors"]},
+            {"id": 5, "type": "CustomLoraLoader", "widgets_values": ["unknown.safetensors"]}]}
+        result = self.inspect([("prompt", graph), ("workflow", workflow)])
+        self.assertEqual({v["hash"] for v in result["loras"]}, {"11111111", "22222222", ""})
+        self.assertNotIn("stale.safetensors", [v["name"] for v in result["loras"]])
+        self.assertTrue(any("不同哈希" in n for n in result["notes"]))
+        self.assertTrue(any("无法识别" in n for n in result["notes"]))
+
+    def test_editor_explicit_named_model_hash(self):
+        workflow = {"nodes": [{"id": 7, "type": "LoraLoaderModelOnly", "widgets_values": ["style.safetensors", 1],
+                     "properties": {"models": [{"name": "style.safetensors", "hash": "a" * 64}]}}]}
+        result = self.inspect([("workflow", workflow)])
+        self.assertEqual(result["loras"][0]["hash"], "A" * 64)
+        workflow["nodes"][0]["properties"]["models"][0]["name"] = "other.safetensors"
+        self.assertEqual(self.inspect([("workflow", workflow)])["loras"][0]["hash"], "")
+
 
 if __name__ == "__main__":
     unittest.main()
